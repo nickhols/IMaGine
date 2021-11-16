@@ -1,3 +1,5 @@
+package com.violetdingler;
+
 public class ZLibStream {
     byte[] encodedStream;
     byte[] decodedStream;
@@ -10,96 +12,100 @@ public class ZLibStream {
     int[] distanceBaseLookupTable = {1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577};
     int[] distanceExtraBitLookupTable = {0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13};
 
-    ZLibStream(byte[] encodedStream){
+    public ZLibStream(byte[] encodedStream){
         this.encodedStream = encodedStream;
         decodedStream = new byte[100000000];
     }
-    
-    public byte[] decode(){
-        try {
-            byte CMFByte = encodedStream[0];
-            //CMF bits 0-3 define compression method, only defined for 8 = deflate algorithm
-            //If not 8, throw exception
-            if ((CMFByte & 0x0F) != 0x08){
-                throw new unrecognizedZLibStreamException();
+
+    public byte[] getDecodedStream(){
+        return decodedStream;
+    }
+
+    public byte[] decode() throws Exception {
+        byte CMFByte = encodedStream[0];
+        //CMF bits 0-3 define compression method, only defined for 8 = deflate algorithm
+        //If not 8, throw exception
+        if ((CMFByte & 0x0F) != 0x08){
+            throw new unrecognizedZLibStreamException();
+        }
+        //CMF bits 4-7 define LZ77 Compression window size
+        int windowSize = (int) Math.pow(2,((CMFByte >> 4) + 8));
+        window = new byte[windowSize];
+        byte FLGByte = encodedStream[1];
+        //FLG bits 0-4 must be set so that CMF concatenated with FLG is divisible by 31
+        //If not, throw exception
+        if((bytesToIntegerBigEndian(encodedStream, 2, 0) % 31) != 0){
+            throw new unrecognizedZLibStreamException();
+        }
+        //FLG bit 5 (FDICT) designates whether a dictionary is used for the adler32 sum
+        byte FDICT = (byte) (FLGByte & 0b00100000);
+        int dataIndex = 0;
+        if (FDICT == 0b00100000){
+            dataIndex = 6;
+        }
+        else {
+            dataIndex = 2;
+        }
+        //FLG bits 6-7 designate compression level, not used by this program
+
+
+        //
+        //Decompress the data
+        //
+        bs = new LSBBitstream(encodedStream, dataIndex/*, encodedStream.length - 4 - dataIndex*/);
+
+
+        //
+        //read blocks until end of data
+        //
+        int BFINAL = 0; //Indicates if this is the final block of data
+        int BTYPE = 0; //2 bit number indicating compression of block: 00=none, 01=fixed Huffman codes, 10 = dynamic huffman codes
+        while(BFINAL != 1 && !bs.EOF()){
+            BFINAL = (int)bs.getNextBit();
+            BTYPE = (int) bs.getBits(2, false);
+            if(BTYPE == 0){
+                //
+                //Read Unecrypted Block
+                //
+                readUnecryptedBlock();
             }
-            //CMF bits 4-7 define LZ77 Compression window size
-            int windowSize = (int) Math.pow(2,((CMFByte >> 4) + 8));
-            window = new byte[windowSize];
-            byte FLGByte = encodedStream[1];
-            //FLG bits 0-4 must be set so that CMF concatenated with FLG is divisible by 31
-            //If not, throw exception
-            if((bytesToIntegerBigEndian(encodedStream, 2, 0) % 31) != 0){
-                throw new unrecognizedZLibStreamException();
-            }
-            //FLG bit 5 (FDICT) designates whether a dictionary is used for the adler32 sum
-            byte FDICT = (byte) (FLGByte & 0b00100000);
-            int dataIndex = 0;
-            if (FDICT == 0b00100000){
-                dataIndex = 6;
-            }
-            else {
-                dataIndex = 2;
-            }
-            //FLG bits 6-7 designate compression level, not used by this program
-
-
-            //
-            //Decompress the data
-            //
-            bs = new LSBBitstream(encodedStream, dataIndex/*, encodedStream.length - 4 - dataIndex*/);
-
-
-            //
-            //read blocks until end of data
-            //
-            int BFINAL = 0; //Indicates if this is the final block of data
-            int BTYPE = 0; //2 bit number indicating compression of block: 00=none, 01=fixed Huffman codes, 10 = dynamic huffman codes
-            while(BFINAL != 1 && !bs.EOF()){
-                BFINAL = (int)bs.getNextBit();
-                BTYPE = (int) bs.getBits(2, false);
-                if(BTYPE == 0){
-                    //
-                    //Read Unecrypted Block
-                    //
-                    readUnecryptedBlock();
-                }
-                else if(BTYPE == 1 || BTYPE == 2){
-                    //
-                    //Block is encrypted
-                    //
-                    //Generate Huffman Trees for this block
-                    //BTYPE == 1, Fixed Huffman Codes
-                    //BTYPE == 2, Dynamic Huffman Codes
-                    //
-                    if(BTYPE == 2){
-                        //Use given huffman code lengths
-                        //Do something...
-                        generateDynamicHuffmanTrees();
-                    }
-                    else{
-                        //Use default huffman code lengths
-                        hufLiteral = new HuffmanTree();
-                        hufDistance = new HuffmanTree();
-                    }
-
-
-                    //
-                    //Read Bytes until end of the encrypted block
-                    //
-                    int streamState = 1;
-                    while(streamState != 0){
-                        streamState = outputNextBytes();
-                    }
+            else if(BTYPE == 1 || BTYPE == 2){
+                //
+                //Block is encrypted
+                //
+                //Generate Huffman Trees for this block
+                //BTYPE == 1, Fixed Huffman Codes
+                //BTYPE == 2, Dynamic Huffman Codes
+                //
+                if(BTYPE == 2){
+                    //Use given huffman code lengths
+                    //Do something...
+                    generateDynamicHuffmanTrees();
                 }
                 else{
-                    throw new unrecognizedZLibStreamException();
+                    //Use default huffman code lengths
+                    hufLiteral = new HuffmanTree();
+                    hufDistance = new HuffmanTree(30);
+                    for(int i = 0; i < 30; i++){
+                        hufDistance.bits[i] = 5;
+                        hufDistance.generateCodes(5);
+                    }
+                }
+
+
+                //
+                //Read Bytes until end of the encrypted block
+                //
+                int streamState = 1;
+                while(streamState != 0){
+                    streamState = outputNextBytes();
                 }
             }
-
-        } catch (Exception e) {
-            e.printStackTrace();
+            else{
+                throw new unrecognizedZLibStreamException();
+            }
         }
+
         byte[] decodedStream = new byte[decodedStreamIndex];
         System.arraycopy(this.decodedStream, 0, decodedStream, 0, decodedStreamIndex);
         return decodedStream;
@@ -129,7 +135,7 @@ public class ZLibStream {
         return output;
     }
     
-    public int outputNextBytes(){
+    public int outputNextBytes() throws Exception {
         int symbol = getNextLiteral();
         if(symbol == 256){
             return 0;
@@ -171,7 +177,7 @@ public class ZLibStream {
             length = 258;
         }
         else{
-            //throw new unrecognizedZLibStreamException();
+            //throw new com.violetdingler.unrecognizedZLibStreamException();
         }
         int distance = getNextDistance();
         for(int i = 0; i < length; i++){
@@ -183,7 +189,7 @@ public class ZLibStream {
         return 1;
     }
 
-    public int getNextCodeLengths(int index){
+    public int getNextCodeLengths(int index) throws Exception {
         //
         //index = which code length to fill in using the next found code length
         //      this counts hufDistance as an extension of hufLiteral when index goes above the size of hufLiteral
@@ -261,7 +267,7 @@ public class ZLibStream {
         return hufLiteral.lookupTableSymbol[huffmanCode];
     }
     
-    public int getNextDistance(){
+    public int getNextDistance() throws Exception {
         int huffmanCode = (int) bs.getNextBit();
         int codeBits = 1;
         while (hufDistance.lookupTableBits[huffmanCode] == 0 || hufDistance.lookupTableBits[huffmanCode] != codeBits) {
@@ -274,7 +280,7 @@ public class ZLibStream {
         return distance;
     }
 
-    public void generateDynamicHuffmanTrees(){
+    public void generateDynamicHuffmanTrees() throws Exception {
 
         int HLIT = (int)bs.getBits(5,false);
         int HDIST = (int)bs.getBits(5,false);

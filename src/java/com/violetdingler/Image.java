@@ -1,3 +1,5 @@
+package com.violetdingler;
+
 import java.io.FileOutputStream;
 
 public class Image {

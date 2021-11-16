@@ -1,5 +1,6 @@
+package com.violetdingler;
+
 import java.io.File;
-import java.io.IOException;
 
 public class Main {
 
@@ -12,14 +13,12 @@ public class Main {
             File directoryPath = new File(args[1]);
             File[] fileList = directoryPath.listFiles();
             for (File file : fileList) {
-                if(file.getAbsolutePath().endsWith(".png")){
+                if(file.getAbsolutePath().toLowerCase().endsWith(".png")){
                     String inputFilename = file.getAbsolutePath();
                     String outputFilename = inputFilename.substring(0, inputFilename.length() - 4) + ".bmp";
                     System.out.println("Converting file " + inputFilename + " to " + outputFilename + "...");
-                    PNGImage inputImage = new PNGImage();
-                    inputImage.read(inputFilename);
-                    BMPImage outputImage = new BMPImage(inputImage);
-                    outputImage.write(outputFilename);
+
+                    convertPNGtoBMP(inputFilename, outputFilename);
                 }
             }
         }
@@ -41,16 +40,22 @@ public class Main {
                 outputFilename = args[1].substring(0, args[1].length() - 4) + ".bmp";
             }
 
-
-
-
-            PNGImage inputImage = new PNGImage();
-            inputImage.read(inputFilename);
-            BMPImage outputImage = new BMPImage(inputImage);
-            outputImage.write(outputFilename);
-
+            convertPNGtoBMP(inputFilename, outputFilename);
         }
     }
+
+    public static void convertPNGtoBMP(String inputFilename, String outputFilename){
+        try {
+            PNGImage inputImage = new PNGImage();
+            inputImage.readFile(inputFilename);
+            BMPImage outputImage = new BMPImage(inputImage);
+            outputImage.write(outputFilename);
+        } catch(Exception e){
+            System.out.println("There was an error converting " + inputFilename + " into " + outputFilename + ". Please ensure the input file is correctly formatted.");
+            e.printStackTrace();
+        }
+    }
+
 }
 
 

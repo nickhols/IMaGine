@@ -1,3 +1,5 @@
+package com.violetdingler;
+
 public class HuffmanTree {
     int[] code;
     int[] bits;
@@ -41,7 +43,7 @@ public class HuffmanTree {
 
     void generateCodes(int maxBits){
         //
-        //This method calculates the Huffman codes of this HuffmanTree object using the code bit lengths
+        //This method calculates the Huffman codes of this com.violetdingler.HuffmanTree object using the code bit lengths
         //
         int maxCode = (1 << maxBits) - 1;
         int currentCode = 0;
