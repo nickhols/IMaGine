@@ -1,8 +1,12 @@
-package com.violetdingler;
+package com.nicholasdingler.image;
 
-import java.io.FileInputStream;
+import com.nicholasdingler.InputBitstream.InputMSBBitstream;
+import com.nicholasdingler.InputStreamWrapper.BufferInputStreamWrapper;
+import com.nicholasdingler.InputStreamWrapper.FileInputStreamWrapper;
+import com.nicholasdingler.ZLibStream;
+import com.nicholasdingler.unrecognizedFormatException;
 
-public class PNGImage extends Image{
+public class PNGImage extends Image {
     private int colorType;
     private int compression;
     private int interlacing;
@@ -48,12 +52,8 @@ public class PNGImage extends Image{
         this.interlacing = interlacing;
     }
 
-    public void readFile(String filename) throws Exception {
+    public void read() throws Exception {
         fin = new FileInputStreamWrapper(filename);
-        read();
-    }
-
-    private void read() throws Exception {
         readMetaData(fin);
         readData(fin);
         ZLibStream zl = new ZLibStream(IDAT);
@@ -357,7 +357,8 @@ public class PNGImage extends Image{
 //    }
 
     private void pushSubImage(byte[] subImageScanlines, int nPixelsInScanline, int nScanlines, int firstScanline, int scanlineDifferential, int pixelDifferential, int firstPixel) throws Exception {
-        MSBBitstream subImageBitStream = new MSBBitstream(subImageScanlines);
+        //MSBBitstream subImageBitStream = new MSBBitstream(subImageScanlines);
+        InputMSBBitstream subImageBitStream = new InputMSBBitstream(new BufferInputStreamWrapper(subImageScanlines));
         for(int i = 0; i < nScanlines; i++){
             for(int j = 0; j < nPixelsInScanline; j++){
                 int value = 0;
@@ -580,5 +581,9 @@ public class PNGImage extends Image{
             palette[i][1] = chunk[3*i + 1 + 8];
             palette[i][2] = chunk[3*i + 2 + 8];
         }
+    }
+
+    public void write() throws Exception {
+
     }
 }

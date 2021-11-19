@@ -1,4 +1,4 @@
-package com.violetdingler;
+package com.nicholasdingler.image;
 
 import java.io.FileOutputStream;
 
@@ -6,7 +6,7 @@ public class BMPImage extends Image {
     byte[] scanlines;
     int stride;
 
-    BMPImage(){
+    public BMPImage(){
         int size = 200;
         pixels = new int[size][size][4];
         height = size;
@@ -18,7 +18,7 @@ public class BMPImage extends Image {
         }
     }
 
-    BMPImage(Image sourceImage){
+    public BMPImage(Image sourceImage){
         width = sourceImage.width;
         height = sourceImage.height;
         xOffset = sourceImage.xOffset;
@@ -27,7 +27,7 @@ public class BMPImage extends Image {
         pixels = sourceImage.pixels;
     }
 
-    void write(String outputFilePath) throws Exception {
+    public void write(String outputFilePath) throws Exception {
         if(!outputFilePath.endsWith(".bmp")){
             System.out.println("Unrecognized file extension.");
             return;

@@ -1,4 +1,4 @@
-package com.violetdingler;
+package com.nicholasdingler;
 
 public class HuffmanTree {
     int[] code;

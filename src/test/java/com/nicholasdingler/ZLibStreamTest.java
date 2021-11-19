@@ -1,6 +1,4 @@
-package com.violetdingler;
-
-import com.violetdingler.ZLibStream;
+package com.nicholasdingler;
 
 import java.io.IOException;
 import java.io.InputStream;

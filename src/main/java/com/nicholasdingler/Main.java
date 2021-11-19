@@ -1,4 +1,7 @@
-package com.violetdingler;
+package com.nicholasdingler;
+
+import com.nicholasdingler.image.BMPImage;
+import com.nicholasdingler.image.PNGImage;
 
 import java.io.File;
 
@@ -47,7 +50,8 @@ public class Main {
     public static void convertPNGtoBMP(String inputFilename, String outputFilename){
         try {
             PNGImage inputImage = new PNGImage();
-            inputImage.readFile(inputFilename);
+            inputImage.setFilename(inputFilename);
+            inputImage.read();
             BMPImage outputImage = new BMPImage(inputImage);
             outputImage.write(outputFilename);
         } catch(Exception e){

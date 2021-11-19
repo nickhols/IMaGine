@@ -1,40 +1,41 @@
-package com.violetdingler;
+package com.nicholasdingler.InputStreamWrapper;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
 
-public class FileInputStreamWrapper {
+public class FileInputStreamWrapper extends InputStreamWrapper {
     private FileInputStream fin;
     private File fileObject;
-    long fileSize;
-    long bytesRead;
+    private long fileSize;
 
-    FileInputStreamWrapper(String filename) throws Exception {
+    public FileInputStreamWrapper(String filename) throws Exception {
         fin = new FileInputStream(filename);
         fileObject = new File(filename);
         fileSize = fileObject.length();
+        index = 0;
     }
 
     public boolean EOF(){
-        if(fileSize > bytesRead){
-            return false;
-        }
-        return true;
+        return index >= fileSize;
     }
 
     public int read(byte[] buffer, int off, int len) throws Exception {
         //Puts data into supplied buffer, return value is number of bytes read in this operation
-        if((long)len > fileSize - bytesRead){
-            len = (int)(fileSize - bytesRead);
+        if((long)len > fileSize - index){
+            len = (int)(fileSize - index);
         }
         fin.read(buffer, off, len);
-        bytesRead += len;
+        index += len;
         return len;
     }
 
     public void close() throws Exception {
         fin.close();
+    }
+
+    public byte read() throws Exception{
+        byte output = (byte) fin.read();
+        index++;
+        return output;
     }
 }

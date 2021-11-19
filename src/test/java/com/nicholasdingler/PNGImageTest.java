@@ -1,5 +1,6 @@
-package com.violetdingler;
+package com.nicholasdingler;
 
+import com.nicholasdingler.image.PNGImage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,7 +29,7 @@ class PNGImageTest {
 
     @Test
     void readFile() throws Exception {
-        image.readFile(file.getAbsolutePath());
+        image.read(file.getAbsolutePath());
         assertEquals(255, image.pixels[0][0][0]);
         assertEquals(255, image.pixels[0][0][1]);
         assertEquals(255, image.pixels[0][0][2]);

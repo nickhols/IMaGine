@@ -1,8 +1,8 @@
-package com.violetdingler;
+package com.nicholasdingler.image;
 
 import java.io.FileOutputStream;
 
-public class Image {
+public abstract class Image {
     public int width;
     public int height;
     public int xOffset;
@@ -10,6 +10,7 @@ public class Image {
     public int bitdepth;
     public int[][][] pixels;
     FileOutputStream fout;
+    String filename;
 
     public int getWidth(){
         return width;
@@ -31,6 +32,8 @@ public class Image {
         return bitdepth;
     }
 
+    public String getFilename() { return filename; }
+
     public void setWidth(int width){
         this.width = width;
     }
@@ -50,6 +53,8 @@ public class Image {
     public void setBitdepth(int bitdepth) {
         this.bitdepth = bitdepth;
     }
+
+    public void setFilename(String filename) { this.filename = filename; }
 
     public boolean bufferEquals(byte[] buffer1, byte[] buffer2, int length){
         return bufferEqualsOffset(buffer1, buffer2, 0, 0, length);
@@ -101,5 +106,24 @@ public class Image {
         }
         return output;
     }
+
+    public void read() throws Exception{
+        throw new Exception("Reading this file format is not yet supported.");
+    }
+
+    public void read(String filename) throws Exception {
+        setFilename(filename);
+        read();
+    }
+
+    public void write() throws Exception{
+        throw new Exception("Writing this file format is not yet supported.");
+    }
+
+    public void write(String filename) throws Exception {
+        setFilename(filename);
+        write();
+    }
+
 
 }

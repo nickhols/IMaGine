@@ -1,40 +1,14 @@
-package com.violetdingler;
+package com.nicholasdingler.InputBitstream;
 
-import java.io.File;
-import java.io.FileInputStream;
+import com.nicholasdingler.InputStreamWrapper.InputStreamWrapper;
 
-public class MSBBitstream {
-    byte[] inputBuffer;
-    int nBytesRead;
-    long bitCache;
-    int nBitsCache;
-    int length;
+public class InputMSBBitstream extends InputBitstream{
 
-    MSBBitstream(byte[] inputBuffer){
-        this.inputBuffer = inputBuffer;
-        bitCache = 0;
-        nBitsCache = 0;
-        nBytesRead = 0;
-        length = inputBuffer.length;
+    public InputMSBBitstream(InputStreamWrapper stream){
+        this.stream = stream;
     }
 
-    MSBBitstream(byte[] inputBuffer, int offset){
-        this.inputBuffer = inputBuffer;
-        bitCache = 0;
-        nBitsCache = 0;
-        nBytesRead = offset;
-        //this.length = length;
-        length = inputBuffer.length;
-    }
-
-    public boolean EOF(){
-        if(nBytesRead >= length){
-            return true;
-        }
-        return false;
-    }
-
-    public long getBits(int nBits, boolean outputByteMSBasLSB) throws Exception {
+    public long getBits(int nBits, boolean invertOutput) throws Exception {
         long output = 0;
         //Make sure call asks for <= 56 bits, as the cached data is stored as a primitive long
         //Because a new byte may need to be read, limit to 64-8 = 56
@@ -43,7 +17,7 @@ public class MSBBitstream {
         }
         //Read New bytes until number of cached bits is larger than the called number
         while (nBitsCache < nBits && !EOF()) {
-            byte tempByte = inputBuffer[nBytesRead++];
+            byte tempByte = stream.read();
             //bitCache |= (tempByte << nBitsCache);
             bitCache = bitCache << 8;
             bitCache |= ((long)tempByte & 0xFF);
@@ -54,7 +28,7 @@ public class MSBBitstream {
         nBitsCache -= nBits;
         long mask = ((long) 1 << nBitsCache) - 1;
         bitCache &= mask;
-        if (outputByteMSBasLSB) {
+        if (invertOutput) {
             for (int i = 0; i < nBits; i++) {
                 output = output << 1;
                 output |= tempOutput & 1;
@@ -65,11 +39,5 @@ public class MSBBitstream {
             output = tempOutput;
         }
         return output;
-    }
-
-
-    public void skipToNextByte(){
-        bitCache = 0;
-        nBitsCache = 0;
     }
 }

@@ -1,7 +1,7 @@
-package com.violetdingler;
+package com.nicholasdingler;
 
 public class unrecognizedFormatException extends Exception {
-    unrecognizedFormatException(){
+    public unrecognizedFormatException(){
 
     }
 }

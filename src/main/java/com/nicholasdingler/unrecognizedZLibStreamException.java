@@ -1,7 +1,7 @@
-package com.violetdingler;
+package com.nicholasdingler;
 
 public class unrecognizedZLibStreamException extends Exception {
-    unrecognizedZLibStreamException(){
+    public unrecognizedZLibStreamException(){
 
     }
 }

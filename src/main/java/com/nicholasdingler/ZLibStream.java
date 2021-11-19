@@ -1,28 +1,32 @@
-package com.violetdingler;
+package com.nicholasdingler;
+
+import com.nicholasdingler.InputBitstream.InputLSBBitstream;
+import com.nicholasdingler.InputStreamWrapper.BufferInputStreamWrapper;
 
 public class ZLibStream {
-    byte[] encodedStream;
-    byte[] decodedStream;
-    int decodedStreamIndex;
+    byte[] deflatedStream;
+    byte[] inflatedStream;
+    int inflatedStreamIndex;
+    int inflatedStreamMaxIndex;
     byte[] window;
     HuffmanTree hufLiteral;
     HuffmanTree hufDistance;
     HuffmanTree hufDictionary;
-    LSBBitstream bs;
+    InputLSBBitstream bs;
     int[] distanceBaseLookupTable = {1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577};
     int[] distanceExtraBitLookupTable = {0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13};
 
-    public ZLibStream(byte[] encodedStream){
-        this.encodedStream = encodedStream;
-        decodedStream = new byte[100000000];
+    public ZLibStream(byte[] deflatedStream){
+        this.deflatedStream = deflatedStream;
+        inflatedStream = new byte[100000000];
     }
 
     public byte[] getDecodedStream(){
-        return decodedStream;
+        return inflatedStream;
     }
 
     public byte[] decode() throws Exception {
-        byte CMFByte = encodedStream[0];
+        byte CMFByte = deflatedStream[0];
         //CMF bits 0-3 define compression method, only defined for 8 = deflate algorithm
         //If not 8, throw exception
         if ((CMFByte & 0x0F) != 0x08){
@@ -31,10 +35,10 @@ public class ZLibStream {
         //CMF bits 4-7 define LZ77 Compression window size
         int windowSize = (int) Math.pow(2,((CMFByte >> 4) + 8));
         window = new byte[windowSize];
-        byte FLGByte = encodedStream[1];
+        byte FLGByte = deflatedStream[1];
         //FLG bits 0-4 must be set so that CMF concatenated with FLG is divisible by 31
         //If not, throw exception
-        if((bytesToIntegerBigEndian(encodedStream, 2, 0) % 31) != 0){
+        if((bytesToIntegerBigEndian(deflatedStream, 2, 0) % 31) != 0){
             throw new unrecognizedZLibStreamException();
         }
         //FLG bit 5 (FDICT) designates whether a dictionary is used for the adler32 sum
@@ -52,7 +56,7 @@ public class ZLibStream {
         //
         //Decompress the data
         //
-        bs = new LSBBitstream(encodedStream, dataIndex/*, encodedStream.length - 4 - dataIndex*/);
+        bs = new InputLSBBitstream(new BufferInputStreamWrapper(deflatedStream, dataIndex));
 
 
         //
@@ -106,8 +110,8 @@ public class ZLibStream {
             }
         }
 
-        byte[] decodedStream = new byte[decodedStreamIndex];
-        System.arraycopy(this.decodedStream, 0, decodedStream, 0, decodedStreamIndex);
+        byte[] decodedStream = new byte[inflatedStreamIndex];
+        System.arraycopy(this.inflatedStream, 0, decodedStream, 0, inflatedStreamIndex);
         return decodedStream;
     }
 
@@ -141,9 +145,9 @@ public class ZLibStream {
             return 0;
         }
         if(symbol < 256){
-            decodedStream[decodedStreamIndex] = (byte)symbol;
-            window[decodedStreamIndex % window.length] = decodedStream[decodedStreamIndex];
-            decodedStreamIndex++;
+            inflatedStream[inflatedStreamIndex] = (byte)symbol;
+            window[inflatedStreamIndex % window.length] = inflatedStream[inflatedStreamIndex];
+            inflatedStreamIndex++;
             return 1;
         }
         //
@@ -181,10 +185,10 @@ public class ZLibStream {
         }
         int distance = getNextDistance();
         for(int i = 0; i < length; i++){
-            decodedStream[decodedStreamIndex] = window[(decodedStreamIndex + window.length - distance) % window.length];
-            window[decodedStreamIndex % window.length] = decodedStream[decodedStreamIndex];
+            inflatedStream[inflatedStreamIndex] = window[(inflatedStreamIndex + window.length - distance) % window.length];
+            window[inflatedStreamIndex % window.length] = inflatedStream[inflatedStreamIndex];
             //decodedStream[decodedStreamIndex] = decodedStream[(decodedStreamIndex + window.length - distance) % window.length];
-            decodedStreamIndex++;
+            inflatedStreamIndex++;
         }
         return 1;
     }
@@ -257,7 +261,7 @@ public class ZLibStream {
         return i;
     }
 
-    public int getNextLiteral(){
+    public int getNextLiteral() throws Exception {
         int huffmanCode = (int) bs.getNextBit();
         int codeBits = 1;
         while (hufLiteral.lookupTableBits[huffmanCode] == 0 || hufLiteral.lookupTableBits[huffmanCode] != codeBits) {
@@ -326,16 +330,115 @@ public class ZLibStream {
         hufDistance.generateCodes(18);
     }
 
-    public void readUnecryptedBlock(){
+    public void readUnecryptedBlock() throws Exception {
         //Skip to the next byte boundary
         bs.skipToNextByte();
-        int len = bytesToIntegerLittleEndian(bs.inputBuffer, 2, bs.nBytesRead);
-        int nlen = bytesToIntegerLittleEndian(bs.inputBuffer, 2, bs.nBytesRead + 2);
+        int len = (int)bs.getBits(16, false);
+        int nlen = (int)bs.getBits(16, false);
         for(int i = 0; i < len; i++){
-            decodedStream[decodedStreamIndex] = bs.inputBuffer[bs.nBytesRead + 4 + i];
-            window[decodedStreamIndex % window.length] = decodedStream[decodedStreamIndex];
-            decodedStreamIndex++;
+            inflatedStream[inflatedStreamIndex] = (byte)bs.getBits(8, false);
+            window[inflatedStreamIndex % window.length] = inflatedStream[inflatedStreamIndex];
+            inflatedStreamIndex++;
         }
-        bs.nBytesRead += len + 4;
+    }
+
+    public void deflate(byte[] inflatedStream){
+        this.inflatedStream = inflatedStream;
+        deflatedStream[0] = 0x78;//CMF Byte, Deflate with 32k Window
+        deflatedStream[1] = 0x01;//No Adler dict, no compression info
+        window = new byte[0x8000];
+        //
+        //Chained Hashmap data structure used by the deflate algorithm
+        //Hashes 3 bytes from an index, stores it for future use in the compression algorithm
+        //Later hashes will look through the chained hash at the relevant key to select the position with the longest overlap
+        //
+        class HashMapNode {
+            int position;
+            HashMapNode nextNode;
+            HashMapNode(){
+                position = 0;
+                nextNode = null;
+            }
+            HashMapNode(int position, HashMapNode nextNode){
+                this.position = position;
+                this.nextNode = nextNode;
+            }
+            int getPosition(){
+                return position;
+            }
+            int findOverlap(){
+                int overlapDistance = 0;
+                while(inflatedStreamIndex + overlapDistance < inflatedStreamMaxIndex &&
+                        inflatedStream[position + overlapDistance] == inflatedStream[inflatedStreamIndex + overlapDistance]){
+                    overlapDistance++;
+                }
+                return overlapDistance;
+            }
+        }
+        class HashMapLinkedList{
+            HashMapNode firstNode;
+            HashMapLinkedList(){
+                firstNode = null;
+            }
+            void push(int position){
+                firstNode = new HashMapNode(position, firstNode);
+            }
+            HashMapNode getHighestOverlap(){
+                int overlap = 0;
+                HashMapNode hashMapIterator = firstNode;
+                HashMapNode returnNode = null;
+                while(hashMapIterator != null && hashMapIterator.getPosition() >= inflatedStreamIndex - window.length){
+                    int tempOverlap = hashMapIterator.findOverlap();
+                    if(tempOverlap > overlap){
+                        overlap = tempOverlap;
+                        returnNode = hashMapIterator;
+                    }
+                }
+                return returnNode;
+            }
+        }
+        //
+        //
+        //
+        int hashTableSize = 101;
+        HashMapLinkedList[] hashMap = new HashMapLinkedList[hashTableSize];
+        //Use default huffman code lengths
+        hufLiteral = new HuffmanTree();
+        hufDistance = new HuffmanTree(30);
+        for(int i = 0; i < 30; i++){
+            hufDistance.bits[i] = 5;
+            hufDistance.generateCodes(5);
+        }
+
+        //
+        //Iterate through data
+        //
+        while(inflatedStreamIndex <= inflatedStreamMaxIndex - 2){
+            int hashInput = ((int)inflatedStream[inflatedStreamIndex]) << 16;
+            hashInput += ((int)inflatedStream[inflatedStreamIndex + 1]) << 8;
+            hashInput += ((int)inflatedStream[inflatedStreamIndex + 2]);
+            int key = getKey(hashInput, hashTableSize);
+
+            HashMapNode overlapNode = hashMap[key].getHighestOverlap();
+            if(overlapNode != null && overlapNode.findOverlap() > 1 ){
+                //Use length/distance huffman codes
+            }
+            else{
+                //Use raw data code
+            }
+            //Store position and increment
+            hashMap[key].push(inflatedStreamIndex++);
+        }
+
+    }
+
+    public int getKey(int value, int modulo){
+        int key;
+        key = (value >> 24) & 0xFF;
+        key += (value >> 16) & 0xFF;
+        key += (value >> 8) & 0xFF;
+        key += (value) & 0xFF;
+        key = key % modulo;
+        return key;
     }
 }
