@@ -3,6 +3,7 @@ package com.nicholasdingler.image;
 import com.nicholasdingler.InputBitstream.InputMSBBitstream;
 import com.nicholasdingler.InputStreamWrapper.BufferInputStreamWrapper;
 import com.nicholasdingler.InputStreamWrapper.FileInputStreamWrapper;
+import com.nicholasdingler.InputStreamWrapper.InputStreamWrapper;
 import com.nicholasdingler.ZLibStream;
 import com.nicholasdingler.unrecognizedFormatException;
 
@@ -56,10 +57,15 @@ public class PNGImage extends Image {
         fin = new FileInputStreamWrapper(filename);
         readMetaData(fin);
         readData(fin);
-        ZLibStream zl = new ZLibStream(IDAT);
-        dataStream = zl.decode();
+        ZLibStream zl = new ZLibStream();
+        zl.inflate(new BufferInputStreamWrapper(IDAT));
+        dataStream = TEMP(zl.getInflatedStream());
         parseDatastream();
         fin.close();
+    }
+
+    private byte[] TEMP(InputStreamWrapper isw) throws Exception {
+        return isw.readAll();
     }
 
     private void readMetaData(FileInputStreamWrapper fin) throws Exception {
