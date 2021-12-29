@@ -1,5 +1,8 @@
 package com.nicholasdingler.image;
 
+import com.nicholasdingler.InputStreamWrapper.FileInputStreamWrapper;
+import com.nicholasdingler.InputStreamWrapper.InputStreamWrapper;
+
 import java.io.FileOutputStream;
 
 public abstract class Image {
@@ -8,9 +11,19 @@ public abstract class Image {
     public int xOffset;
     public int yOffset;
     public int bitdepth;
+    public byte[] bitmap;
     public int[][][] pixels;
     FileOutputStream fout;
     String filename;
+
+    public enum bitmapFormat{
+        gry,
+        bgr,
+        rgb,
+        grya,
+        bgra,
+        rgba
+    }
 
     public int getWidth(){
         return width;
@@ -107,13 +120,12 @@ public abstract class Image {
         return output;
     }
 
-    public void read() throws Exception{
+    public void read(InputStreamWrapper fin) throws Exception{
         throw new Exception("Reading this file format is not yet supported.");
     }
 
     public void read(String filename) throws Exception {
-        setFilename(filename);
-        read();
+        read(new FileInputStreamWrapper(filename));
     }
 
     public void write() throws Exception{

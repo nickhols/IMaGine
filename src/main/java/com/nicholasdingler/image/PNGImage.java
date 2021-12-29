@@ -1,11 +1,11 @@
 package com.nicholasdingler.image;
 
 import com.nicholasdingler.InputBitstream.InputMSBBitstream;
-import com.nicholasdingler.InputStreamWrapper.BufferInputStreamWrapper;
-import com.nicholasdingler.InputStreamWrapper.FileInputStreamWrapper;
-import com.nicholasdingler.InputStreamWrapper.InputStreamWrapper;
+import com.nicholasdingler.InputStreamWrapper.*;
 import com.nicholasdingler.ZLibStream;
 import com.nicholasdingler.unrecognizedFormatException;
+
+import java.nio.Buffer;
 
 public class PNGImage extends Image {
     private int colorType;
@@ -53,28 +53,27 @@ public class PNGImage extends Image {
         this.interlacing = interlacing;
     }
 
-    public void read() throws Exception {
-        fin = new FileInputStreamWrapper(filename);
+    public void read(String filename)throws Exception{
+        read(new FileInputStreamWrapper(filename));
+    }
+
+    public void read(FileInputStreamWrapper fin) throws Exception {
         readMetaData(fin);
         readData(fin);
         ZLibStream zl = new ZLibStream();
         zl.inflate(new BufferInputStreamWrapper(IDAT));
-        dataStream = TEMP(zl.getInflatedStream());
+        dataStream = zl.getInflatedStream().readAll();
         parseDatastream();
         fin.close();
     }
 
-    private byte[] TEMP(InputStreamWrapper isw) throws Exception {
-        return isw.readAll();
-    }
-
     private void readMetaData(FileInputStreamWrapper fin) throws Exception {
         //Ensure that the
-        int bufferSize = 10000;
-        byte[] buffer = new byte[bufferSize];
-        fin.read(buffer, 0, 8);
+        int signatureBufferSize = 8;
+        byte[] signatureBuffer = new byte[signatureBufferSize];
+        fin.read(signatureBuffer, 0, 8);
         byte[] signature = {(byte) 137, 80, 78, 71, 13, 10, 26, 10};
-        if(!bufferEquals(buffer, signature, 8)){
+        if(!bufferEquals(signatureBuffer, signature, 8)){
             System.out.println("Invalid PNG Format.");
             throw new unrecognizedFormatException();
         }
@@ -109,7 +108,6 @@ public class PNGImage extends Image {
             default:
                 throw new unrecognizedFormatException();
         }
-        //stride = 1 + ( ( BPP * width + ((BPP * width) % 8)) / 8);
     }
 
     private void readData(FileInputStreamWrapper fin) throws Exception {

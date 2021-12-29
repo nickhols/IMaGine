@@ -1,7 +1,6 @@
 package com.nicholasdingler;
 
 import com.nicholasdingler.InputBitstream.InputLSBBitstream;
-import com.nicholasdingler.InputStreamWrapper.BufferInputStreamWrapper;
 import com.nicholasdingler.InputStreamWrapper.InputStreamWrapper;
 import com.nicholasdingler.OutputBitstream.OutputLSBBitstream;
 import com.nicholasdingler.OutputStreamWrapper.BufferOutputStreamWrapper;
@@ -390,7 +389,7 @@ public class ZLibStream {
             int findOverlap() throws Exception {
                 int overlapDistance = 0;
                 while(inStream.addressable(inflatedStreamIndex + overlapDistance) &&
-                        inStream.readFromIndex(position + overlapDistance) == inStream.readFromIndex(inflatedStreamIndex + overlapDistance)){
+                        inStream.peek(position + overlapDistance) == inStream.peek(inflatedStreamIndex + overlapDistance)){
                     overlapDistance++;
                 }
                 return overlapDistance;
@@ -442,9 +441,9 @@ public class ZLibStream {
         //Iterate through data
         //
         while(inStream.addressable(inflatedStreamIndex + 2)){
-            int hashInput = ((int)inStream.readFromIndex(inflatedStreamIndex)) << 16;
-            hashInput += ((int)inStream.readFromIndex(inflatedStreamIndex)) << 8;
-            hashInput += ((int)inStream.readFromIndex(inflatedStreamIndex));
+            int hashInput = ((int)inStream.peek(inflatedStreamIndex)) << 16;
+            hashInput += ((int)inStream.peek(inflatedStreamIndex)) << 8;
+            hashInput += ((int)inStream.peek(inflatedStreamIndex));
             int key = getKey(hashInput, hashTableSize);
 
             HashMapNode overlapNode = hashMap[key].getHighestOverlap();
@@ -476,7 +475,7 @@ public class ZLibStream {
             }
             else{
                 //Use raw data code
-                bs.write(hufLiteral.code[(int)inStream.readFromIndex(inflatedStreamIndex)], hufLiteral.bits[(int)inStream.readFromIndex(inflatedStreamIndex)], true);
+                bs.write(hufLiteral.code[(int)inStream.peek(inflatedStreamIndex)], hufLiteral.bits[(int)inStream.peek(inflatedStreamIndex)], true);
                 //Store position and increment
                 hashMap[key].push(inflatedStreamIndex++);
             }
@@ -485,7 +484,7 @@ public class ZLibStream {
         //Use Huffman codes for final 2 literals, assuming they weren't copied from earlier in stream
         //
         while(inStream.addressable(inflatedStreamIndex)){
-            bs.write(hufLiteral.code[(int)inStream.readFromIndex(inflatedStreamIndex)], hufLiteral.bits[(int)inStream.readFromIndex(inflatedStreamIndex)], true);
+            bs.write(hufLiteral.code[(int)inStream.peek(inflatedStreamIndex)], hufLiteral.bits[(int)inStream.peek(inflatedStreamIndex)], true);
             inflatedStreamIndex++;
         }
         bs.write(hufLiteral.code[256], hufLiteral.bits[256], true);

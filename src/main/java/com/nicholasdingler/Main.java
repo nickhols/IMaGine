@@ -1,5 +1,6 @@
 package com.nicholasdingler;
 
+import com.nicholasdingler.InputStreamWrapper.FileInputStreamWrapper;
 import com.nicholasdingler.image.BMPImage;
 import com.nicholasdingler.image.PNGImage;
 
@@ -51,7 +52,7 @@ public class Main {
         try {
             PNGImage inputImage = new PNGImage();
             inputImage.setFilename(inputFilename);
-            inputImage.read();
+            inputImage.read(new FileInputStreamWrapper(inputFilename));
             BMPImage outputImage = new BMPImage(inputImage);
             outputImage.write(outputFilename);
         } catch(Exception e){
