@@ -1,10 +1,13 @@
 package com.nicholasdingler.image;
 
+import com.nicholasdingler.ArrayUtil;
 import com.nicholasdingler.InputBitstream.InputMSBBitstream;
 import com.nicholasdingler.InputStreamWrapper.*;
+import com.nicholasdingler.OutputStreamWrapper.OutputStreamWrapper;
 import com.nicholasdingler.ZLibStream;
 import com.nicholasdingler.unrecognizedFormatException;
 
+import java.lang.reflect.Array;
 import java.nio.Buffer;
 
 public class PNGImage extends Image {
@@ -16,7 +19,6 @@ public class PNGImage extends Image {
     private byte[] dataStream;
     private byte[] rawScanlines;
     private byte[][] palette;
-    private FileInputStreamWrapper fin;
 
     //private int stride;
     private int BPP;
@@ -82,28 +84,33 @@ public class PNGImage extends Image {
         //Read IHDR Chunk
         byte[] IHDRChunk = readChunk(fin);
         //Get important data from the IHDR buffer, including dimensions, BPP, Color type, Compression method, Filter type, and Interlacing format
-        setWidth(bytesToIntegerBigEndian(IHDRChunk, 4, 8));
-        setHeight(bytesToIntegerBigEndian(IHDRChunk, 4, 12));
-        setBitdepth(bytesToIntegerBigEndian(IHDRChunk, 1, 16));
-        setColorType(bytesToIntegerBigEndian(IHDRChunk, 1, 17));
-        setCompression(bytesToIntegerBigEndian(IHDRChunk, 1, 18));
-        setFilter(bytesToIntegerBigEndian(IHDRChunk, 1, 19));
-        setInterlacing(bytesToIntegerBigEndian(IHDRChunk, 1, 20));
+        setWidth(ArrayUtil.bytesToIntegerBigEndian(IHDRChunk, 4, 8));
+        setHeight(ArrayUtil.bytesToIntegerBigEndian(IHDRChunk, 4, 12));
+        setBitdepth(ArrayUtil.bytesToIntegerBigEndian(IHDRChunk, 1, 16));
+        setColorType(ArrayUtil.bytesToIntegerBigEndian(IHDRChunk, 1, 17));
+        setCompression(ArrayUtil.bytesToIntegerBigEndian(IHDRChunk, 1, 18));
+        setFilter(ArrayUtil.bytesToIntegerBigEndian(IHDRChunk, 1, 19));
+        setInterlacing(ArrayUtil.bytesToIntegerBigEndian(IHDRChunk, 1, 20));
         switch(colorType){
             case 0://Greyscale
                 BPP = bitdepth;
+                bitmapFormat = BitmapFormat.gs;
                 break;
             case 2:
                 BPP = bitdepth * 3;
+                bitmapFormat = BitmapFormat.rgb;
                 break;
             case 3:
                 BPP = bitdepth;
+                bitmapFormat = BitmapFormat.rgb;
                 break;
             case 4:
                 BPP = bitdepth * 2;
+                bitmapFormat = BitmapFormat.gsa;
                 break;
             case 6:
                 BPP = bitdepth * 4;
+                bitmapFormat = BitmapFormat.rgba;
                 break;
             default:
                 throw new unrecognizedFormatException();
@@ -120,9 +127,9 @@ public class PNGImage extends Image {
             if(bufferEqualsOffset(chunk, IDATSignature, 4, 0, 4)){//Chunk is an IDAT Chunk, Critical/Public
                 //Create new IDAT Array to replace old one
                 //Because arrays can't be resized, and multiple IDAT Chunks are possible and should be concatenated
-                byte[] IDATNew = new byte[IDAT.length + bytesToIntegerBigEndian(chunk, 4, 0)];
+                byte[] IDATNew = new byte[IDAT.length + ArrayUtil.bytesToIntegerBigEndian(chunk, 4, 0)];
                 System.arraycopy(IDAT, 0, IDATNew, 0, IDAT.length);
-                System.arraycopy(chunk, 8, IDATNew, IDAT.length, bytesToIntegerBigEndian(chunk, 4, 0));
+                System.arraycopy(chunk, 8, IDATNew, IDAT.length, ArrayUtil.bytesToIntegerBigEndian(chunk, 4, 0));
                 IDAT = IDATNew;
             }
             else if(bufferEqualsOffset(chunk, PLTESignature, 4, 0, 4)){//Chunk is the IEND Chunk, Critical/Public
@@ -149,12 +156,22 @@ public class PNGImage extends Image {
     private byte[] readChunk(FileInputStreamWrapper fin) throws Exception {
         byte[] lengthBuffer = new byte[4];
         fin.read(lengthBuffer, 0, 4);
-        int chunkLength = bytesToIntegerBigEndian(lengthBuffer,4, 0);
+        int chunkLength = ArrayUtil.bytesToIntegerBigEndian(lengthBuffer,4, 0);
         byte[] buffer = new byte[chunkLength + 12];
-        for(int i = 0; i < 4; i ++){
-            buffer[i] = lengthBuffer[i];
-        }
+        System.arraycopy(lengthBuffer, 0, buffer, 0, 4);
         fin.read(buffer, 4, chunkLength + 8);
+        byte[] crcData = new byte[chunkLength + 4];
+        byte[] crcActual = new byte[4];
+        byte[] crcExpected = new byte[4];
+        System.arraycopy(buffer, 4, crcData, 0, chunkLength + 4);
+        System.arraycopy(buffer, chunkLength + 8, crcExpected, 0, 4);
+        crcActual = calculateCRC(crcData);
+        for(int i = 0; i < 4; i++){
+            if(crcActual[i] != crcExpected[i]) {
+                System.out.print("Invalid Chunk CRC: " + buffer[4] + buffer[5] + buffer[6] + buffer[7]);
+                break;
+            }
+        }
         return buffer;
     }
 
@@ -271,95 +288,6 @@ public class PNGImage extends Image {
         System.arraycopy(dataStream, inputOffset, output, outputOffset, nBytesInScanline);
     }
 
-//    private int[] parseScanline(com.violetdingler.MSBBitstream bs, int scanlineIndex, int pass){
-//        //
-//        //This method will extract the next scanline from the datastream
-//        //for a non-interlaced image passNumber will be set to 0
-//        //
-//        int nPixels = 0;
-//        int pixelDifferential = 0;
-//        int firstPixel = 0;
-//        switch(pass){
-//            case 1:
-//                nPixels = (width + 7)/8;
-//                pixelDifferential = 8;
-//                firstPixel = 0;
-//                break;
-//            case 2:
-//                nPixels = (width + 3)/8;
-//                pixelDifferential = 8;
-//                firstPixel = 4;
-//                break;
-//            case 3:
-//                nPixels = (width + 3)/4;
-//                pixelDifferential = 4;
-//                firstPixel = 0;
-//                break;
-//            case 4:
-//                nPixels = (width + 1)/4;
-//                pixelDifferential = 4;
-//                firstPixel = 2;
-//                break;
-//            case 5:
-//                nPixels = (width + 1)/2;
-//                pixelDifferential = 2;
-//                firstPixel = 0;
-//                break;
-//            case 6:
-//                nPixels = (width)/2;
-//                pixelDifferential = 2;
-//                firstPixel = 1;
-//                break;
-//            case 7:
-//            case 0:
-//                nPixels = (width);
-//                pixelDifferential = 1;
-//                firstPixel = 0;
-//                break;
-//        }
-//        for(int i = 0; i < nPixels; i++){
-//            int value = 0;
-//            int pixelNumber = i * pixelDifferential + firstPixel;
-////            switch(colorType){
-////                case 0:
-////                    value = (int) bs.getBits(bitdepth, false);
-////                    pixels[scanlineIndex][pixelNumber][0] = value;
-////                    pixels[scanlineIndex][pixelNumber][1] = value;
-////                    pixels[scanlineIndex][pixelNumber][2] = value;
-////                    pixels[scanlineIndex][pixelNumber][3] = 0xFFFF;
-////                    break;
-////                case 2:
-////                    pixels[scanlineIndex][pixelNumber][0] = (int)bs.getBits(bitdepth, false);
-////                    pixels[scanlineIndex][pixelNumber][1] = (int)bs.getBits(bitdepth, false);
-////                    pixels[scanlineIndex][pixelNumber][2] = (int)bs.getBits(bitdepth, false);
-////                    pixels[scanlineIndex][pixelNumber][3] = 0xFFFF;
-////                    break;
-////                case 3:
-////                    value = (int) bs.getBits(bitdepth, false);
-////                    pixels[scanlineIndex][pixelNumber][0] = palette[value][0];
-////                    pixels[scanlineIndex][pixelNumber][1] = palette[value][1];
-////                    pixels[scanlineIndex][pixelNumber][2] = palette[value][2];
-////                    pixels[scanlineIndex][pixelNumber][3] = 0xFFFF;
-////                    break;
-////                case 4:
-////                    value = (int) bs.getBits(bitdepth, false);
-////                    pixels[scanlineIndex][pixelNumber][0] = value;
-////                    pixels[scanlineIndex][pixelNumber][1] = value;
-////                    pixels[scanlineIndex][pixelNumber][2] = value;
-////                    pixels[scanlineIndex][pixelNumber][3] = (int) bs.getBits(bitdepth, false);
-////                    break;
-////                case 6:
-////                    pixels[scanlineIndex][pixelNumber][0] = (int)bs.getBits(bitdepth, false);
-////                    pixels[scanlineIndex][pixelNumber][1] = (int)bs.getBits(bitdepth, false);
-////                    pixels[scanlineIndex][pixelNumber][2] = (int)bs.getBits(bitdepth, false);
-////                    pixels[scanlineIndex][pixelNumber][3] = (int)bs.getBits(bitdepth, false);
-////                    break;
-////            }
-//        }
-//        bs.skipToNextByte();
-//
-//    }
-
     private void pushSubImage(byte[] subImageScanlines, int nPixelsInScanline, int nScanlines, int firstScanline, int scanlineDifferential, int pixelDifferential, int firstPixel) throws Exception {
         //MSBBitstream subImageBitStream = new MSBBitstream(subImageScanlines);
         InputMSBBitstream subImageBitStream = new InputMSBBitstream(new BufferInputStreamWrapper(subImageScanlines));
@@ -441,86 +369,6 @@ public class PNGImage extends Image {
         return rawScanlines;
     }
 
-/*    private void parseScanlines(){
-        reconstructScanlines();
-        if(filteredScanlines.length != height * stride && interlacing == 0){
-            System.out.println("Unexpected data length.");
-            return;
-        }
-        pixels = new int[height][width][4];
-
-        com.violetdingler.MSBBitstream bs = new com.violetdingler.MSBBitstream(rawScanlines);
-        int value = 0;
-        for(int i = 0; i < height; i++){
-            for(int j = 0; j < width; j++){
-                switch(colorType){
-                    case 0:
-                        value = (int) bs.getBits(bitdepth, false);
-                        pixels[i][j][0] = value;
-                        pixels[i][j][1] = value;
-                        pixels[i][j][2] = value;
-                        pixels[i][j][3] = 0xFFFF;
-                        break;
-                    case 2:
-                        pixels[i][j][0] = (int)bs.getBits(bitdepth, false);
-                        pixels[i][j][1] = (int)bs.getBits(bitdepth, false);
-                        pixels[i][j][2] = (int)bs.getBits(bitdepth, false);
-                        pixels[i][j][3] = 0xFFFF;
-                        break;
-                    case 3:
-                        value = (int) bs.getBits(bitdepth, false);
-                        pixels[i][j][0] = palette[value][0];
-                        pixels[i][j][1] = palette[value][1];
-                        pixels[i][j][2] = palette[value][2];
-                        pixels[i][j][3] = 0xFFFF;
-                        break;
-                    case 4:
-                        value = (int) bs.getBits(bitdepth, false);
-                        pixels[i][j][0] = value;
-                        pixels[i][j][1] = value;
-                        pixels[i][j][2] = value;
-                        pixels[i][j][3] = (int) bs.getBits(bitdepth, false);
-                        break;
-                    case 6:
-                        pixels[i][j][0] = (int)bs.getBits(bitdepth, false);
-                        pixels[i][j][1] = (int)bs.getBits(bitdepth, false);
-                        pixels[i][j][2] = (int)bs.getBits(bitdepth, false);
-                        pixels[i][j][3] = (int)bs.getBits(bitdepth, false);
-                        break;
-                }
-            }
-        }
-    }
-
-    private void reconstructScanlines() {
-        rawScanlines = new byte[stride * height];
-        for(int i = 0; i < height; i++){
-            int filter = filteredScanlines[i*stride];
-            for(int j = 0; j < stride - 1; j++){
-                byte byteA = getByteA(i * (stride - 1) + j);
-                byte byteB = getByteB(i * (stride - 1) + j);
-                byte byteC = getByteC(i * (stride - 1) + j);
-                switch(filter){
-                    case 0://No Filter
-                        rawScanlines[i * (stride - 1) + j] = filteredScanlines[i * stride + j + 1];
-                    break;
-                    case 1://Sub Filter
-                        rawScanlines[i * (stride - 1) + j] = (byte) (filteredScanlines[i * stride + j + 1] + byteA);
-                    break;
-                    case 2://Up Filter
-                        rawScanlines[i * (stride - 1) + j] = (byte) (filteredScanlines[i * stride + j + 1] + byteB);
-                        break;
-                    case 3://Average Filter
-                        rawScanlines[i * (stride - 1) + j] = (byte) (filteredScanlines[i * stride + j + 1] + ((((int)byteA & 0xFF) + ((int)byteB & 0xFF) ) >> 1) & 0xFF);
-                        break;
-                    case 4://Paeth Filter
-                        rawScanlines[i * (stride - 1) + j] = (byte) (filteredScanlines[i * stride + j + 1] + computePaethPredictor(byteA, byteB, byteC));
-                        break;
-                }
-            }
-        }
-    }*/
-
     private byte getByteA(int index, byte[] rawScanlines, int stride) throws Exception {
         int indexInScanline = index % stride;
         byte byteA = 0;
@@ -587,7 +435,67 @@ public class PNGImage extends Image {
         }
     }
 
+    public void write(OutputStreamWrapper fout) throws Exception {
+        this.fout = fout;
+        write();
+    }
+
     public void write() throws Exception {
+        //write PNG signature
+        fout.write( new byte[] {(byte)137, 80, 78, 71, 13, 10, 26, 10}, 0, 8);
+        //write IHDR Chunk
+        byte[] chunkName = {73, 72, 68, 82};
+        byte[] chunkData = new byte[13];
+        System.arraycopy(ArrayUtil.integerToBytesBigEndian(width, 4), 0, chunkData, 0, 4);
+        System.arraycopy(ArrayUtil.integerToBytesBigEndian(width, 4), 0, chunkData, 4, 4);
+        chunkData[8] = (byte)bitdepth;
+        chunkData[9] = 6;
+        chunkData[10] = 0;
+        chunkData[11] = 0;
+        chunkData[12] = 0;
+        writeChunk(chunkName, chunkData);
+        //write IDAT Chunk
+        chunkName[0] = 0x49;
+        chunkName[1] = 0x44;
+        chunkName[2] = 0x41;
+        chunkName[3] = 0x54;
+
+        //write IEND Chunk
+    }
+
+    public void writeChunk(byte[] chunkName, byte[] chunkData) throws Exception{
+        fout.write(ArrayUtil.integerToBytesBigEndian(chunkData.length, 4), 0, 4);
+        fout.write(chunkName, 0, 4);
+        fout.write(chunkData, 0, chunkData.length);
+        //CRC calculation
+        byte[] crcData = new byte[4 + chunkData.length];
+        System.arraycopy(chunkName, 0, crcData, 0, 4);
+        System.arraycopy(chunkData, 0, crcData, 4, chunkData.length);
+        fout.write(calculateCRC(crcData), 0, 4);
+    }
+
+    public byte[] calculateCRC(byte[] input){ //See "Sample Cyclic Redundancy Code implementation" in the PNG specification
+        long[] crcTable = new long[256];
+
+        for (int n = 0; n < 256; n++) {
+            long c = (long) n;
+            for (int k = 0; k < 8; k++) {
+                if ((c & 1) == 1)
+                    c = 0xedb88320L ^ (c >> 1);
+                else
+                    c = c >> 1;
+            }
+            crcTable[n] = c;
+        }
+
+        long c = 0xffffffffL;
+        for (int n = 0; n < input.length; n++) {
+            c = crcTable[(int)( (c & 0xFF) ^ (input[n] & 0xFF) ) & 0xff] ^ (c >> 8);
+        }
+
+        c = c & 0xFFFFFFFFL;
+        c = c ^ 0xFFFFFFFFL;
+        return ArrayUtil.integerToBytesBigEndian((int)c, 4);
 
     }
 }

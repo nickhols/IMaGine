@@ -51,8 +51,7 @@ public class Main {
     public static void convertPNGtoBMP(String inputFilename, String outputFilename){
         try {
             PNGImage inputImage = new PNGImage();
-            inputImage.setFilename(inputFilename);
-            inputImage.read(new FileInputStreamWrapper(inputFilename));
+            inputImage.read(inputFilename);
             BMPImage outputImage = new BMPImage(inputImage);
             outputImage.write(outputFilename);
         } catch(Exception e){

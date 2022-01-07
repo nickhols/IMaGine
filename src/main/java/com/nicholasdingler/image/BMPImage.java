@@ -65,7 +65,7 @@ public class BMPImage extends Image {
 //            stride = width * 4 + (4 - (width * 4) % 4) % 4;
 //            //
 //            scanlines = new byte[height * stride];
-        fout = new FileOutputStream(outputFilePath);
+        FileOutputStream fout = new FileOutputStream(outputFilePath);
         byte[] writeBuffer = integerToBytesLittleEndian(0x4D42, 2);
         fout.write(writeBuffer);
         //fout.write(integerToBytesLittleEndian(0x3A, 4));

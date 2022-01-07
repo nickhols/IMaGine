@@ -30,17 +30,26 @@ class PNGImageTest {
     @Test
     void readFile() throws Exception {
         image.read(file.getAbsolutePath());
-        assertEquals(255, image.pixels[0][0][0]);
-        assertEquals(255, image.pixels[0][0][1]);
-        assertEquals(255, image.pixels[0][0][2]);
-        assertEquals(255, image.pixels[0][128][0]);
-        assertEquals(0, image.pixels[0][128][1]);
-        assertEquals(0, image.pixels[0][128][2]);
-        assertEquals(0, image.pixels[128][0][0]);
-        assertEquals(255, image.pixels[128][0][1]);
-        assertEquals(0, image.pixels[128][0][2]);
-        assertEquals(0, image.pixels[128][128][0]);
-        assertEquals(0, image.pixels[128][128][1]);
-        assertEquals(255, image.pixels[128][128][2]);
+        assertEquals(255, image.getPixels()[0][0][0]);
+        assertEquals(255, image.getPixels()[0][0][1]);
+        assertEquals(255, image.getPixels()[0][0][2]);
+        assertEquals(255, image.getPixels()[0][128][0]);
+        assertEquals(0, image.getPixels()[0][128][1]);
+        assertEquals(0, image.getPixels()[0][128][2]);
+        assertEquals(0, image.getPixels()[128][0][0]);
+        assertEquals(255, image.getPixels()[128][0][1]);
+        assertEquals(0, image.getPixels()[128][0][2]);
+        assertEquals(0, image.getPixels()[128][128][0]);
+        assertEquals(0, image.getPixels()[128][128][1]);
+        assertEquals(255, image.getPixels()[128][128][2]);
+    }
+
+    @Test
+    void calculateCRC() {
+        byte[] data = {0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x03, 0x52, 0x00, 0x00, 0x02, (byte) 0x9B, 0x08, 0x06, 0x00, 0x00, 0x00};
+        byte[] crc = image.calculateCRC(data);
+        for(int i = 0; i < 4; i++){
+            System.out.println(crc[i]);
+        }
     }
 }
