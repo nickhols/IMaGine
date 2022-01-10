@@ -3,6 +3,8 @@ package com.nicholasdingler.image;
 import com.nicholasdingler.ArrayUtil;
 import com.nicholasdingler.InputBitstream.InputMSBBitstream;
 import com.nicholasdingler.InputStreamWrapper.*;
+import com.nicholasdingler.OutputBitstream.OutputMSBBitstream;
+import com.nicholasdingler.OutputStreamWrapper.BufferOutputStreamWrapper;
 import com.nicholasdingler.OutputStreamWrapper.OutputStreamWrapper;
 import com.nicholasdingler.ZLibStream;
 import com.nicholasdingler.unrecognizedFormatException;
@@ -20,7 +22,20 @@ public class PNGImage extends Image {
     private byte[] rawScanlines;
     private byte[][] palette;
 
-    //private int stride;
+    public PNGImage(){
+
+    }
+
+    public PNGImage(Image sourceImage){
+        width = sourceImage.width;
+        height = sourceImage.height;
+        xOffset = sourceImage.xOffset;
+        yOffset = sourceImage.yOffset;
+        bitdepth = sourceImage.bitdepth;
+        pixels = sourceImage.pixels;
+        BPP = bitdepth * 4;
+    }
+
     private int BPP;
 
     public int getColorType() {
@@ -401,6 +416,42 @@ public class PNGImage extends Image {
         return byteC;
     }
 
+    private byte getByteA(int index, InputStreamWrapper currentScanline, InputStreamWrapper previousScanline) throws Exception {
+        if(index - (BPP / 8) < 1 || index == 1){
+            return 0;
+        }
+        byte byteA = 0;
+        if(BPP < 8){
+            byteA = currentScanline.peek(index - 1);
+        }
+        else{
+            byteA = currentScanline.peek(index - BPP/8);
+        }
+        return byteA;
+    }
+
+    private byte getByteB(int index, InputStreamWrapper currentScanline, InputStreamWrapper previousScanline) throws Exception {
+        //if(previousScanline.){
+        //    return 0;
+        //}
+        byte byteB = previousScanline.peek(index);
+        return byteB;
+    }
+
+    private byte getByteC(int index, InputStreamWrapper currentScanline, InputStreamWrapper previousScanline) throws Exception {
+        if(index - (BPP / 8) < 1 || index == 1){
+            return 0;
+        }
+        byte byteC = 0;
+        if(BPP < 8){
+            byteC = previousScanline.peek(index - 1);
+        }
+        else{
+            byteC = previousScanline.peek(index - BPP/8);
+        }
+        return byteC;
+    }
+
     private int computePaethPredictor(int a, int b, int c){
 
         if (a < 0)
@@ -435,11 +486,6 @@ public class PNGImage extends Image {
         }
     }
 
-    public void write(OutputStreamWrapper fout) throws Exception {
-        this.fout = fout;
-        write();
-    }
-
     public void write() throws Exception {
         //write PNG signature
         fout.write( new byte[] {(byte)137, 80, 78, 71, 13, 10, 26, 10}, 0, 8);
@@ -447,7 +493,7 @@ public class PNGImage extends Image {
         byte[] chunkName = {73, 72, 68, 82};
         byte[] chunkData = new byte[13];
         System.arraycopy(ArrayUtil.integerToBytesBigEndian(width, 4), 0, chunkData, 0, 4);
-        System.arraycopy(ArrayUtil.integerToBytesBigEndian(width, 4), 0, chunkData, 4, 4);
+        System.arraycopy(ArrayUtil.integerToBytesBigEndian(height, 4), 0, chunkData, 4, 4);
         chunkData[8] = (byte)bitdepth;
         chunkData[9] = 6;
         chunkData[10] = 0;
@@ -459,8 +505,16 @@ public class PNGImage extends Image {
         chunkName[1] = 0x44;
         chunkName[2] = 0x41;
         chunkName[3] = 0x54;
-
+        BufferInputStreamWrapper encodedBitmap = encodeScanlines();
+        chunkData = encodedBitmap.readAll();
+        writeChunk(chunkName, chunkData);
         //write IEND Chunk
+        chunkData = new byte[0];
+        chunkName[0] = 0x49;
+        chunkName[1] = 0x45;
+        chunkName[2] = 0x4E;
+        chunkName[3] = 0x44;
+        writeChunk(chunkName, chunkData);
     }
 
     public void writeChunk(byte[] chunkName, byte[] chunkData) throws Exception{
@@ -474,7 +528,7 @@ public class PNGImage extends Image {
         fout.write(calculateCRC(crcData), 0, 4);
     }
 
-    public byte[] calculateCRC(byte[] input){ //See "Sample Cyclic Redundancy Code implementation" in the PNG specification
+    private byte[] calculateCRC(byte[] input){ //See "Sample Cyclic Redundancy Code implementation" in the PNG specification
         long[] crcTable = new long[256];
 
         for (int n = 0; n < 256; n++) {
@@ -497,5 +551,90 @@ public class PNGImage extends Image {
         c = c ^ 0xFFFFFFFFL;
         return ArrayUtil.integerToBytesBigEndian((int)c, 4);
 
+    }
+
+    private BufferInputStreamWrapper encodeScanlines() throws Exception {
+        if(height == 0){
+            return new BufferInputStreamWrapper(new byte[0]);
+        }
+        int sampleMask = (1 << bitdepth) - 1;
+        int stride = ((BPP * width - (BPP * width) % 8) + 8) / 8;
+        if((BPP * width) % 8 != 0){
+            stride++;
+        }
+
+        OutputMSBBitstream bs = new OutputMSBBitstream(new BufferOutputStreamWrapper());
+        bs.write(0, 8, false);
+        for(int j = 0; j < width; j++){
+            bs.write(pixels[0][j][0], bitdepth, false);
+            bs.write(pixels[0][j][1], bitdepth, false);
+            bs.write(pixels[0][j][2], bitdepth, false);
+            bs.write(pixels[0][j][3], bitdepth, false);
+        }
+        InputStreamWrapper previousScanline = bs.getStream().getInputStreamWrapper();
+        for(int i = 1; i < height; i++){
+            OutputMSBBitstream unfilteredScanlineBitstream = new OutputMSBBitstream(new BufferOutputStreamWrapper());
+            unfilteredScanlineBitstream.write(0, 8, false);
+            for(int j = 0; j < width; j++){
+                unfilteredScanlineBitstream.write(pixels[i][j][0], bitdepth, false);
+                unfilteredScanlineBitstream.write(pixels[i][j][1], bitdepth, false);
+                unfilteredScanlineBitstream.write(pixels[i][j][2], bitdepth, false);
+                unfilteredScanlineBitstream.write(pixels[i][j][3], bitdepth, false);
+            }
+            unfilteredScanlineBitstream.skipToNextByte();
+            InputStreamWrapper unfilteredScanline = unfilteredScanlineBitstream.getStream().getInputStreamWrapper();
+            int[] sums = new int[5];
+            int scanlineIndex = 1;
+            while(!unfilteredScanline.EOF()){
+                byte byteA = getByteA(scanlineIndex, unfilteredScanline, previousScanline);
+                byte byteB = getByteB(scanlineIndex, unfilteredScanline, previousScanline);
+                byte byteC = getByteC(scanlineIndex, unfilteredScanline, previousScanline);
+
+                sums[0] += Math.abs(unfilteredScanline.peek(scanlineIndex));
+                sums[1] += Math.abs(unfilteredScanline.peek(scanlineIndex) - byteA);
+                sums[2] += Math.abs(unfilteredScanline.peek(scanlineIndex) - byteB);
+                sums[3] += Math.abs((byte) (unfilteredScanline.peek(scanlineIndex) + ((((int) byteA & 0xFF) + ((int) byteB & 0xFF)) >> 1) & 0xFF));
+                sums[4] += Math.abs(unfilteredScanline.peek(scanlineIndex) - computePaethPredictor(byteA, byteB, byteC));
+                unfilteredScanline.read();
+                scanlineIndex++;
+            }
+            int filter = 0;
+            //sums[0] = 0;
+            for(int n = 1; n < 5; n++){
+                if(sums[n] < sums[filter])
+                    filter = n;
+            }
+            bs.write(filter, 8, false);
+            //scanlineIndex = 1;
+            for(int j = 1; j < stride; j++){
+                byte byteA = getByteA(j, unfilteredScanline, previousScanline);
+                byte byteB = getByteB(j, unfilteredScanline, previousScanline);
+                byte byteC = getByteC(j, unfilteredScanline, previousScanline);
+                switch(filter){
+                    case 0:
+                        bs.write(unfilteredScanline.peek(j), 8, false);
+                        break;
+                    case 1:
+                        bs.write(unfilteredScanline.peek(j) - byteA, 8, false);
+                        break;
+                    case 2:
+                        bs.write(unfilteredScanline.peek(j) - byteB, 8, false);
+                        break;
+                    case 3:
+                        bs.write((byte) (unfilteredScanline.peek(j) + ((((int) byteA & 0xFF) + ((int) byteB & 0xFF)) >> 1) & 0xFF), 8, false);
+                        break;
+                    case 4:
+                        bs.write(unfilteredScanline.peek(j) - (byte)(computePaethPredictor(byteA, byteB, byteC) & 0xFF), 8, false);
+                        break;
+                }
+            }
+            previousScanline = unfilteredScanline;
+            bs.skipToNextByte();
+        }
+        //Finally we have outputbitstream with all the filtered data
+        //Encode using deflate algorithm
+        ZLibStream zls = new ZLibStream();
+
+        return (BufferInputStreamWrapper)zls.deflate(bs.getStream().getInputStreamWrapper());
     }
 }

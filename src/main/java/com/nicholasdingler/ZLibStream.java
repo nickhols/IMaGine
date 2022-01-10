@@ -388,7 +388,7 @@ public class ZLibStream {
             }
             int findOverlap() throws Exception {
                 int overlapDistance = 0;
-                while(inStream.addressable(inflatedStreamIndex + overlapDistance) &&
+                while(inStream.addressable(inflatedStreamIndex + overlapDistance) && position + overlapDistance + 1 < inflatedStreamIndex &&
                         inStream.peek(position + overlapDistance) == inStream.peek(inflatedStreamIndex + overlapDistance)){
                     overlapDistance++;
                 }
@@ -454,14 +454,14 @@ public class ZLibStream {
                 //Do the same for the overlap length
                 //
                 int distance = inflatedStreamIndex - overlapNode.getPosition();
-                int length = overlapNode.findOverlap();
+                int length = Math.min(overlapNode.findOverlap(), 258);
                 int distanceLookupIndex = 0;
-                while(distanceLookupIndex <= 30 && distanceBaseLookupTable[distanceLookupIndex] <= distance){
+                while(distanceLookupIndex < 30 && distanceBaseLookupTable[distanceLookupIndex] <= distance){
                     distanceLookupIndex++;
                 }
                 int distanceExtraBits = distance - distanceBaseLookupTable[--distanceLookupIndex];
                 int lengthLookupIndex = 0;
-                while(lengthLookupIndex <= 29 && lengthBaseLookupTable[lengthLookupIndex] <= length){
+                while(lengthLookupIndex < 29 && lengthBaseLookupTable[lengthLookupIndex] <= length){
                     lengthLookupIndex++;
                 }
                 int lengthExtraBits = length - lengthBaseLookupTable[--lengthLookupIndex];
@@ -475,7 +475,7 @@ public class ZLibStream {
             }
             else{
                 //Use raw data code
-                bs.write(hufLiteral.code[(int)inStream.peek(inflatedStreamIndex)], hufLiteral.bits[(int)inStream.peek(inflatedStreamIndex)], true);
+                bs.write(hufLiteral.code[(int)inStream.peek(inflatedStreamIndex) & 0xFF], hufLiteral.bits[(int)inStream.peek(inflatedStreamIndex) & 0xFF], true);
                 //Store position and increment
                 hashMap[key].push(inflatedStreamIndex++);
             }

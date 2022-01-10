@@ -9,11 +9,19 @@ import java.io.File;
 public class Main {
 
     public static void  main (String[] args){
-        if(args.length < 2 || (!args[0].equals("-d") && !args[0].equals("-i"))){
+        if(args.length < 2 || (!args[0].equals("-d") && !args[0].equals("-i") && !args[0].equals("-pngTest"))){
             System.out.println("Unrecognized Arguments.");
             return;
         }
-        if(args[0].equals("-d")){
+        if(args[0].equals("-pngTest")){
+            String outputFilename;
+            String inputFilename = args[1];
+            outputFilename = args[1].substring(0, args[1].length() - 4) + "Test.png";
+
+            convertPNGtoPNG(inputFilename, outputFilename);
+
+        }
+        else if(args[0].equals("-d")){
             File directoryPath = new File(args[1]);
             File[] fileList = directoryPath.listFiles();
             for (File file : fileList) {
@@ -26,7 +34,7 @@ public class Main {
                 }
             }
         }
-        if(args[0].equals("-i")){
+        else if(args[0].equals("-i")){
             if(!args[1].endsWith(".png")){
                 System.out.println("This Program only supports reading png files at the current time.");
                 return;
@@ -53,6 +61,18 @@ public class Main {
             PNGImage inputImage = new PNGImage();
             inputImage.read(inputFilename);
             BMPImage outputImage = new BMPImage(inputImage);
+            outputImage.write(outputFilename);
+        } catch(Exception e){
+            System.out.println("There was an error converting " + inputFilename + " into " + outputFilename + ". Please ensure the input file is correctly formatted.");
+            e.printStackTrace();
+        }
+    }
+
+    public static void convertPNGtoPNG(String inputFilename, String outputFilename){
+        try {
+            PNGImage inputImage = new PNGImage();
+            inputImage.read(inputFilename);
+            PNGImage outputImage = new PNGImage(inputImage);
             outputImage.write(outputFilename);
         } catch(Exception e){
             System.out.println("There was an error converting " + inputFilename + " into " + outputFilename + ". Please ensure the input file is correctly formatted.");
